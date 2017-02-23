@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 def cross(A, B):
     "Cross product of elements in A and elements in B."
     return [a+b for a in A for b in B]
@@ -114,8 +116,7 @@ def naked_twins(values):
         for b in unit:
             for t in twins:
                 if b not in twins[t]:
-                    values[b] = values[b].replace(t[0], '')
-                    values[b] = values[b].replace(t[1], '')
+                    values[b] = values[b].replace(t[0], '').replace(t[1], '')
                     if len(values[b]) == 1:
                         values = assign_value(values, b, values[b])
     return values
@@ -174,16 +175,12 @@ def solve(grid):
 if __name__ == '__main__':
     diag_sudoku_grid = '2.............62....1....7...6..8...3...9...7...6..4...4....8....52.............3'
     if solve(diag_sudoku_grid):
-        from visualize import visualize_assignments
-        visualize_assignments(assignments)
-#==============================================================================
-#         try:
-#             from visualize import visualize_assignments
-#             visualize_assignments(assignments)
-#         except SystemExit:
-#             pass
-#         except:
-#             print('We could not visualize your board due to a pygame issue. Not a problem! It is not a requirement.')
-#==============================================================================
+        try:
+            from visualize import visualize_assignments
+            visualize_assignments(assignments)
+        except SystemExit:
+            pass
+        except:
+            print('We could not visualize your board due to a pygame issue. Not a problem! It is not a requirement.')
     else:
         print ('No solution found.')
