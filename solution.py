@@ -1,71 +1,9 @@
-def cross(A, B):
-    "Cross product of elements in A and elements in B."
-    return [a+b for a in A for b in B]
+import time
+from collections import defaultdict
+from itertools import combinations
+from utils import *
 
-# row and column names
-rows = 'ABCDEFGHI'
-cols = '123456789'
-
-# names of all boxes
-boxes = cross(rows, cols)
-
-# create units
-row_units = [cross(r, cols) for r in rows]
-column_units = [cross(rows, c) for c in cols]
-square_units = [cross(rs, cs) for rs in ('ABC','DEF','GHI') for cs in ('123','456','789')]
-diagonal_units = [[a+b for a, b in zip('ABCDEFGHI', '123456789')], [a+b for a, b in zip('ABCDEFGHI', '987654321')]]
-unitlist = row_units + column_units + square_units + diagonal_units
-
-# dictionaries to identify units and peers for a certain box
-units = dict((s, [u for u in unitlist if s in u]) for s in boxes)
-peers = dict((s, set(sum(units[s],[]))-set([s])) for s in boxes)
-
-# keep track of all the box assignments
-assignments = []
-
-def assign_value(values, box, value):
-    """
-    Please use this function to update your values dictionary!
-    Assigns a value to a given box. If it updates the board record it.
-    """
-    values[box] = value
-    if len(value) == 1:
-        assignments.append(values.copy())
-    return values
-
-def grid_values(grid):
-    """
-    Convert grid into a dict of {square: char} with '123456789' for empties.
-    Args:
-        grid(string) - A grid in string form.
-    Returns:
-        A grid in dictionary form
-            Keys: The boxes, e.g., 'A1'
-            Values: The value in each box, e.g., '8'. If the box has no value, then the value will be '123456789'.
-    """
-    chars = []
-    digits = '123456789'
-    for c in grid:
-        if c in digits:
-            chars.append(c)
-        if c == '.':
-            chars.append(digits)
-    assert len(chars) == 81
-    return dict(zip(boxes, chars))
-
-def display(values):
-    """
-    Display the values as a 2-D grid.
-    Args:
-        values(dict): The sudoku in dictionary form
-    """
-    width = 1+max(len(values[s]) for s in boxes)
-    line = '+'.join(['-'*(width*3)]*3)
-    for r in rows:
-        print(''.join(values[r+c].center(width)+('|' if c in '36' else '')
-                      for c in cols))
-        if r in 'CF': print(line)
-    return
+start_time = time.time()
 
 def eliminate(values):
     """
@@ -87,36 +25,82 @@ def only_choice(values):
     placed in 1 box within a unit, assign it and solve the box.
     """
     for unit in unitlist:
-        for digit in '123456789':
+        for digit in digits:
             dplaces = [box for box in unit if digit in values[box]]
             if len(dplaces) == 1 and len(values[dplaces[0]]) > 1:
                 values = assign_value(values, dplaces[0], digit)                      
     return values
 
 def naked_twins(values):
-    """Eliminate values using the naked twins strategy.
-    Args:
-        values(dict): a dictionary of the form {'box_name': '123456789', ...}
+    """ For grading purposes """
+    return naked_tuples(values)
 
-    Returns:
-        the values dictionary with the naked twins eliminated from peers.
+def naked_tuples(values):
+    """ Eliminate values using the naked tuples strategy.
+    
+    If, within a unit, we can identify x boxes that all hold the same and exactly x possibilities, we can rule out
+    these possibilities from all other boxes within the unit.
+    """
+    
+    for unit in unitlist:
+        # Step 1: create a dict with possibilities as keys and boxes that have exactly these possibilities as values
+        possibilities = defaultdict(list)
+        for box in unit:
+            possibilities[values[box]].append(box)
+        # Step 2: loop over the keys. If the length of the string exactly matches the numbers of boxes, we have a naked tuple!
+        naked_tuples = {p: possibilities[p] for p in possibilities if len(p) == len(possibilities[p]) > 1}
         
-    Loop over all units. If twins can be identified within a unit, change the other boxes
-    in this unit by eliminating both digits of the twin's value from the possible values.
+        # Step 3: eliminate all possibilities from the naked tuple's values from the other boxes in the unit
+        for b in unit:
+            if len(values[b]) > 1:  # Only check the yet unsolved boxes
+                for nt in naked_tuples:
+                    if b not in naked_tuples[nt]:
+                        for digit in nt:
+                            values[b] = values[b].replace(digit, '')
+                        if len(values[b]) == 1:
+                            # If only 1 possibility remains, assign it using the provided function for visualization purposes
+                            values = assign_value(values, b, values[b])
+    return values
+
+def hidden_tuples(values):
+    """
+    For every combination of existing possibilities within a unit, count the number of yet unsolved boxes that have this combination.
+    If the length of the combination exactly matches this number of boxes and none of the other boxes contain a digit of this combination,
+    we have found a hidden twin.
     """
     for unit in unitlist:
-        # find all twins within the unit
-        twins = dict((values[box], (box, box2)) for box in unit for box2 in unit 
-                      if box is not box2 
-                      if len(values[box]) == 2
-                      if values[box] is values[box2])
-        # remove the twin's values from the other boxes
-        for b in unit:
-            for t in twins:
-                if b not in twins[t]:
-                    values[b] = values[b].replace(t[0], '').replace(t[1], '')
+        # Step 1: define all possible combinations (sorted order) of length 2
+        cs = list()
+        for i in range(2,9):
+            cs += [''.join(c) for c in combinations(digits,i)]
+
+        # Step 2: Make a list of all boxes per combination that contain at least one digit of the combination.
+        ht_candidates = defaultdict(list)
+        for combination in cs:
+            for box in unit:
+                #if len(values[box]) > 1:
+                d_in_box = [d in values[box] for d in combination]
+                if any(d_in_box):  # none of the other boxes may contain this digit:
+                    ht_candidates[combination].append(box)
+                        
+        # Step 3: if the # of boxes exactly matches the # of digits in a combination, we have a hidden tuple.
+        # Of all the candidates that contain at least one digit of the combination,
+        # now each candidate must contain all combination digits
+        hidden_tuples = {c: ht_candidates[c] for c in ht_candidates
+                         if len(c) == len(ht_candidates[c]) > 1
+                         if all([d in values[b] for d in c for b in ht_candidates[c]])
+                         }
+
+        # Step 4: eliminate all values in the hidden tuple that are not part of the shared values
+        for t in hidden_tuples:
+            for b in hidden_tuples[t]:
+                for digit in values[b]:
+                    if digit not in t:
+                        values[b] = values[b].replace(digit, '')
                     if len(values[b]) == 1:
-                        values = assign_value(values, b, values[b])
+                        # If only 1 possibility remains, assign it using the provided function for visualization purposes
+                        values = assign_value(values, b , values[b])
+                        print('I DID A HIDDEN TUPLE')
     return values
 
 def reduce_puzzle(values):
@@ -130,7 +114,8 @@ def reduce_puzzle(values):
         solved_values_before = len([box for box in values.keys() if len(values[box]) == 1])
         values = eliminate(values)
         values = only_choice(values)
-        values = naked_twins(values)
+        values = naked_tuples(values)  # instead of values = naked_twins(values)
+        values = hidden_tuples(values)
         solved_values_after = len([box for box in values.keys() if len(values[box]) == 1])
         stalled = solved_values_before == solved_values_after
         if len([box for box in values.keys() if len(values[box]) == 0]):
@@ -171,14 +156,28 @@ def solve(grid):
     return search(values)
 
 if __name__ == '__main__':
+    print('Test 1:')
     diag_sudoku_grid = '2.............62....1....7...6..8...3...9...7...6..4...4....8....52.............3'
     if solve(diag_sudoku_grid):
-        try:
-            from visualize import visualize_assignments
-            visualize_assignments(assignments)
-        except SystemExit:
-            pass
-        except:
-            print('We could not visualize your board due to a pygame issue. Not a problem! It is not a requirement.')
+        print('SOLUTION FOUND')
+        print()
+#==============================================================================
+#         try:
+#             print('The calculations took %s seconds' % (time.time() - start_time))
+#             from visualize import visualize_assignments
+#             visualize_assignments(assignments)
+#         except SystemExit:
+#             pass
+#         except:
+#             print('We could not visualize your board due to a pygame issue. Not a problem! It is not a requirement.')
+#==============================================================================
     else:
         print ('No solution found.')
+    
+    print('Test 2:')
+    grid = grid_values('2...4.1.79.....24.84.2..56.7124983566.....4..5946...2.45.3.79121..9.4.353.9.1...4')
+    print('Grid before hidden tuples operation:')
+    display(grid)
+    print()
+    print('Grid after hidden tuples operation:')
+    display(hidden_tuples(grid))
