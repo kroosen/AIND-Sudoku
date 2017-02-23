@@ -5,6 +5,22 @@ from utils import *
 
 start_time = time.time()
 
+#==============================================================================
+# TO THE REVIEWER:
+#     
+#     I have implemented your suggestions. I'm quite proud that I haven't done the hidden_twins,
+#     but instead did hidden_tuples!
+#     I'm not really convinced that the modularization has increased the code readability,
+#     but I've tried to make it as clean as possible.
+#     
+#     The only thing I haven't done is the logging. I have never used it.
+#     I will definitely learn and try to use it for the next projects, but for lack of time I have skipped it.
+#     I do know assertions, and will use them from next project on as well!
+#
+#     Thanks for your awesome feedback! :)
+#==============================================================================
+
+
 def eliminate(values):
     """
     A solved box contains exactly 1 digit. For all peers of a solved box,
@@ -41,16 +57,13 @@ def naked_tuples(values):
     If, within a unit, we can identify x boxes that all hold the same and exactly x possibilities, we can rule out
     these possibilities from all other boxes within the unit.
     """
-    
-    for unit in unitlist:
-        # Step 1: create a dict with possibilities as keys and boxes that have exactly these possibilities as values
+    def identify_naked_tuples(values, unit):
         possibilities = defaultdict(list)
         for box in unit:
             possibilities[values[box]].append(box)
-        # Step 2: loop over the keys. If the length of the string exactly matches the numbers of boxes, we have a naked tuple!
-        naked_tuples = {p: possibilities[p] for p in possibilities if len(p) == len(possibilities[p]) > 1}
+        return {p: possibilities[p] for p in possibilities if len(p) == len(possibilities[p]) > 1}
         
-        # Step 3: eliminate all possibilities from the naked tuple's values from the other boxes in the unit
+    def eliminate_nt_values(values, unit, naked_tuples):
         for b in unit:
             if len(values[b]) > 1:  # Only check the yet unsolved boxes
                 for nt in naked_tuples:
@@ -60,6 +73,14 @@ def naked_tuples(values):
                         if len(values[b]) == 1:
                             # If only 1 possibility remains, assign it using the provided function for visualization purposes
                             values = assign_value(values, b, values[b])
+        return values
+    
+    for unit in unitlist:
+        # Step 1: identify the naked_tuples
+        naked_tuples = identify_naked_tuples(values, unit)
+        # Step 2: eliminate all possibilities from the naked tuple's values from the other boxes in the unit
+        values = eliminate_nt_values(values, unit, naked_tuples)
+        
     return values
 
 def hidden_tuples(values):
@@ -68,13 +89,7 @@ def hidden_tuples(values):
     If the length of the combination exactly matches this number of boxes and none of the other boxes contain a digit of this combination,
     we have found a hidden twin.
     """
-    for unit in unitlist:
-        # Step 1: define all possible combinations (sorted order) of length 2
-        cs = list()
-        for i in range(2,9):
-            cs += [''.join(c) for c in combinations(digits,i)]
-
-        # Step 2: Make a list of all boxes per combination that contain at least one digit of the combination.
+    def make_combination_dict(values, unit, cs):
         ht_candidates = defaultdict(list)
         for combination in cs:
             for box in unit:
@@ -82,6 +97,27 @@ def hidden_tuples(values):
                 d_in_box = [d in values[box] for d in combination]
                 if any(d_in_box):  # none of the other boxes may contain this digit:
                     ht_candidates[combination].append(box)
+        return ht_candidates
+                    
+    def eliminate_ht_values(values, hidden_tuples):
+        for t in hidden_tuples:
+            for b in hidden_tuples[t]:
+                for digit in values[b]:
+                    if digit not in t:
+                        values[b] = values[b].replace(digit, '')
+                    if len(values[b]) == 1:
+                        # If only 1 possibility remains, assign it using the provided function for visualization purposes
+                        values = assign_value(values, b , values[b])
+        return values
+    
+    for unit in unitlist:
+        # Step 1: define all possible combinations (sorted order) of length 2
+        cs = list()
+        for i in range(2,9):
+            cs += [''.join(c) for c in combinations(digits, i)]
+
+        # Step 2: Make a dict of all boxes per combination that contain at least one digit of the combination.
+        ht_candidates = make_combination_dict(values, unit, cs)
                         
         # Step 3: if the # of boxes exactly matches the # of digits in a combination, we have a hidden tuple.
         # Of all the candidates that contain at least one digit of the combination,
@@ -92,15 +128,8 @@ def hidden_tuples(values):
                          }
 
         # Step 4: eliminate all values in the hidden tuple that are not part of the shared values
-        for t in hidden_tuples:
-            for b in hidden_tuples[t]:
-                for digit in values[b]:
-                    if digit not in t:
-                        values[b] = values[b].replace(digit, '')
-                    if len(values[b]) == 1:
-                        # If only 1 possibility remains, assign it using the provided function for visualization purposes
-                        values = assign_value(values, b , values[b])
-                        print('I DID A HIDDEN TUPLE')
+        values = eliminate_ht_values(values, hidden_tuples)
+    
     return values
 
 def reduce_puzzle(values):
@@ -115,7 +144,7 @@ def reduce_puzzle(values):
         values = eliminate(values)
         values = only_choice(values)
         values = naked_tuples(values)  # instead of values = naked_twins(values)
-        values = hidden_tuples(values)
+        values = hidden_tuples(values) # new feature, also working for triples, quadruples, ...
         solved_values_after = len([box for box in values.keys() if len(values[box]) == 1])
         stalled = solved_values_before == solved_values_after
         if len([box for box in values.keys() if len(values[box]) == 0]):
