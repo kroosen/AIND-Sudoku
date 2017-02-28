@@ -2,13 +2,15 @@ import time
 from collections import defaultdict
 from itertools import combinations
 from utils import *
+import logging
 
 start_time = time.time()
+logging.basicConfig(filename='sudoku.log', filemode='w', format='%(lineno)d:%(levelname)s: %(message)s', level=logging.DEBUG)
 
 #==============================================================================
 # TO THE REVIEWER:
 #     
-#     I have implemented your suggestions. I'm quite proud that I haven't done the hidden_twins,
+#     I have implemented the suggestions. I'm quite proud that I haven't done the hidden_twins,
 #     but instead did hidden_tuples!
 #     I'm not really convinced that the modularization has increased the code readability,
 #     but I've tried to make it as clean as possible.
@@ -26,6 +28,8 @@ def eliminate(values):
     A solved box contains exactly 1 digit. For all peers of a solved box,
     eliminate this digit from the possibilities
     """
+    logging.info('--- Elimination')
+    
     solved_values = [box for box in values.keys() if len(values[box]) == 1]
     for box in solved_values:
         digit = values[box]
@@ -40,6 +44,8 @@ def only_choice(values):
     Loop over all units. Then loop over all digits (1-9). If a certain digit can only be
     placed in 1 box within a unit, assign it and solve the box.
     """
+    logging.info('--- Only choice')
+    
     for unit in unitlist:
         for digit in digits:
             dplaces = [box for box in unit if digit in values[box]]
@@ -57,6 +63,8 @@ def naked_tuples(values):
     If, within a unit, we can identify x boxes that all hold the same and exactly x possibilities, we can rule out
     these possibilities from all other boxes within the unit.
     """
+    logging.info('--- Naked tuples')
+    
     def identify_naked_tuples(values, unit):
         possibilities = defaultdict(list)
         for box in unit:
@@ -89,6 +97,8 @@ def hidden_tuples(values):
     If the length of the combination exactly matches this number of boxes and none of the other boxes contain a digit of this combination,
     we have found a hidden twin.
     """
+    logging.info('--- Hidden tuples')
+    
     def make_combination_dict(values, unit, cs):
         ht_candidates = defaultdict(list)
         for combination in cs:
@@ -129,7 +139,6 @@ def hidden_tuples(values):
 
         # Step 4: eliminate all values in the hidden tuple that are not part of the shared values
         values = eliminate_ht_values(values, hidden_tuples)
-    
     return values
 
 def reduce_puzzle(values):
@@ -140,11 +149,16 @@ def reduce_puzzle(values):
     """
     stalled = False
     while not stalled:
+        logging.info('New reducing iteration')
         solved_values_before = len([box for box in values.keys() if len(values[box]) == 1])
         values = eliminate(values)
+        #display(values)
         values = only_choice(values)
+        #display(values)
         values = naked_tuples(values)  # instead of values = naked_twins(values)
+        #display(values)
         values = hidden_tuples(values) # new feature, also working for triples, quadruples, ...
+        #display(values)
         solved_values_after = len([box for box in values.keys() if len(values[box]) == 1])
         stalled = solved_values_before == solved_values_after
         if len([box for box in values.keys() if len(values[box]) == 0]):
@@ -160,13 +174,15 @@ def search(values):
     values = reduce_puzzle(values)
     if values is False: return False
     if all(len(values[s]) == 1 for s in boxes): 
+        logging.info('Sudoku solved')
         return values  # The puzzle is solved
+    
     # Choose one of the unfilled squares with the fewest possibilities
     n, s = min((len(values[s]), s) for s in boxes if len(values[s]) > 1)
-
     # Now use recursion to solve each one of the resulting sudokus, and if one returns a value (not False),
     # return that answer!
     for digit in values[s]:
+        logging.info('Assumption made for search purpose')
         new_values = values.copy()
         new_values[s] = digit
         attempt = search(new_values)
@@ -181,12 +197,14 @@ def solve(grid):
     Returns:
         The dictionary representation of the final sudoku grid. False if no solution exists.
     """
+    assert len(grid) == 81
     values = grid_values(grid)
     return search(values)
 
 if __name__ == '__main__':
     print('Test 1:')
     diag_sudoku_grid = '2.............62....1....7...6..8...3...9...7...6..4...4....8....52.............3'
+    diag_sudoku_grid = "..3.2.6..9..3.5..1..18.64....81.29..7.......8..67.82....26.95..8..2.3..9..5.1.3.."
     if solve(diag_sudoku_grid):
         print('SOLUTION FOUND')
         print()
@@ -203,10 +221,12 @@ if __name__ == '__main__':
     else:
         print ('No solution found.')
     
-    print('Test 2:')
-    grid = grid_values('2...4.1.79.....24.84.2..56.7124983566.....4..5946...2.45.3.79121..9.4.353.9.1...4')
-    print('Grid before hidden tuples operation:')
-    display(grid)
-    print()
-    print('Grid after hidden tuples operation:')
-    display(hidden_tuples(grid))
+#==============================================================================
+#     print('Test 2:')
+#     grid = grid_values('2...4.1.79.....24.84.2..56.7124983566.....4..5946...2.45.3.79121..9.4.353.9.1...4')
+#     print('Grid before hidden tuples operation:')
+#     display(grid)
+#     print()
+#     print('Grid after hidden tuples operation:')
+#     display(hidden_tuples(grid))
+#==============================================================================
