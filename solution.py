@@ -15,9 +15,10 @@ logging.basicConfig(filename='sudoku.log', filemode='w', format='%(lineno)d:%(le
 #     I'm not really convinced that the modularization has increased the code readability,
 #     but I've tried to make it as clean as possible.
 #     
-#     The only thing I haven't done is the logging. I have never used it.
-#     I will definitely learn and try to use it for the next projects, but for lack of time I have skipped it.
-#     I do know assertions, and will use them from next project on as well!
+#     I've also added some logging statements as suggested. I learned this can be way cleaner in usage than
+#     just printing everything! Thanks for the tip.
+#
+#       I've implemented 1 assert statement as well. I'll try to use more in the next projects
 #
 #     Thanks for your awesome feedback! :)
 #==============================================================================
